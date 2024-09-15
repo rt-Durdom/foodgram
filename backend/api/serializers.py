@@ -1,12 +1,31 @@
 from rest_framework import serializers
 from users.models import User
-from recipes.models import Recipes, Tags, Ingredients, RecipeIngredients, Favorite, ShoppingCart
+from recipes.models import Recipes, Tags, Ingredients, RecipeIngredients, Favorite, ShoppingCart, ShortLink
 from django.core.files.base import ContentFile
 import base64
 from djoser.serializers import UserCreateSerializer, UserSerializer
 
 
-class UserCustomSerializer(UserSerializer):
+class Base64ImageField(serializers.ImageField): # +
+    def to_internal_value(self, data):
+        if isinstance(data, str) and data.startswith('data:image'):
+            format, imgstr = data.split(';base64,')
+            ext = format.split('/')[-1]
+            data = ContentFile(base64.b64decode(imgstr), name='temp.' + ext)
+        return super().to_internal_value(data)
+
+
+class UserAvatarSerializer(serializers.ModelSerializer): # +
+    avatar = Base64ImageField(allow_null=True)
+
+    class Meta:
+        model = User
+        fields = (
+            'avatar',
+        )
+
+
+class UserCustomSerializer(UserSerializer):  # +
     is_subscribed = serializers.SerializerMethodField()
 
     class Meta:
@@ -28,7 +47,7 @@ class UserCustomSerializer(UserSerializer):
         return obj.following.filter(user=request.user, author=obj).exists()
 
 
-class UserSerializer(UserCreateSerializer):
+class UserSerializer(UserCreateSerializer):  # validatorsfield
 
     class Meta:
         model = User
@@ -42,16 +61,7 @@ class UserSerializer(UserCreateSerializer):
         )
 
 
-class Base64ImageField(serializers.ImageField):
-    def to_internal_value(self, data):
-        if isinstance(data, str) and data.startswith('data:image'):
-            format, imgstr = data.split(';base64,')
-            ext = format.split('/')[-1]
-            data = ContentFile(base64.b64decode(imgstr), name='temp.' + ext)
-        return super().to_internal_value(data)
-
-
-class TagsSerializer(serializers.ModelSerializer):
+class TagsSerializer(serializers.ModelSerializer):  # +
 
     class Meta:
         model = Tags
@@ -62,7 +72,7 @@ class TagsSerializer(serializers.ModelSerializer):
         )
 
 
-class IngredientsSerializer(serializers.ModelSerializer):
+class IngredientsSerializer(serializers.ModelSerializer): # +
 
     class Meta:
         model = Ingredients
@@ -73,7 +83,7 @@ class IngredientsSerializer(serializers.ModelSerializer):
         )
 
 
-class RecipesIngredientsSerializer(serializers.ModelSerializer):
+class RecipesIngredientsSerializer(serializers.ModelSerializer): # +
     id = serializers.IntegerField(source='ingredients.id')
     name = serializers.ReadOnlyField(source='ingredients.name')
     measurement_unit = serializers.ReadOnlyField(source='ingredients.measurement_unit')
@@ -89,8 +99,31 @@ class RecipesIngredientsSerializer(serializers.ModelSerializer):
         )
 
 
-class RecipesShortSerializer(serializers.ModelSerializer):
-    pass
+class ShortLinksSerializer(serializers.Serializer):
+
+    short_link = serializers.CharField(source='short_url')
+
+    class Meta:
+        model = ShortLink
+        fields = (
+            'short_link',
+        )
+    
+    def to_representation(self, instance):
+        return {'short_link': instance.short_url}
+
+class ShortRecipesSerializer(serializers.ModelSerializer):
+    
+    image = Base64ImageField(required=True)
+
+    class Meta:
+        model = Recipes
+        fields = (
+            'id',
+            'name',
+            'image',
+            'cooking_time',
+        )
 
 
 class RecipesListSerializer(serializers.ModelSerializer):
@@ -129,7 +162,7 @@ class RecipesListSerializer(serializers.ModelSerializer):
         return obj.shopping_cart.filter(user=request.user).exists()
 
 
-class CreateIngredientSerializer(serializers.ModelSerializer):
+class CreateIngredientSerializer(serializers.ModelSerializer): # validators
 
     id = serializers.PrimaryKeyRelatedField(queryset=Ingredients.objects.all())
     amount = serializers.IntegerField(min_value=1, write_only=True)
@@ -142,7 +175,7 @@ class CreateIngredientSerializer(serializers.ModelSerializer):
         )
 
 
-class RecipeCreateSerializer(serializers.ModelSerializer):
+class RecipeCreateSerializer(serializers.ModelSerializer): # validators
 
     ingredients = CreateIngredientSerializer(many=True, write_only=True)
     tags = serializers.PrimaryKeyRelatedField(queryset=Tags.objects.all(), many=True)
@@ -184,7 +217,16 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         serializers = RecipesListSerializer(instance, context={'request': request})
         return serializers.data
-    
 
 
+class ShotRecipeSerializer(serializers.ModelSerializer):  # +
+    image = Base64ImageField(required=True)
 
+    class Meta:
+        model = Recipes
+        fields = (
+            'id',
+            'name',
+            'image',
+            'cooking_time',
+        )

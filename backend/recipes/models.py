@@ -159,3 +159,18 @@ class Favorite(models.Model):
     def __str__(self):
         return f'{self.recipe}'
 
+
+class ShortLink(models.Model):
+    """Модель короткой ссылки."""
+
+    long_url = models.URLField(max_length=255, verbose_name='Оригинальная ссылка',)
+    short_url = models.CharField(
+        max_length=132, verbose_name='Короткая ссылка', unique=True
+    )
+
+    class Meta:
+        verbose_name = 'Короткая ссылка'
+        verbose_name_plural = 'короткие ссылки'
+
+    def __str__(self):
+        return self.short_url
