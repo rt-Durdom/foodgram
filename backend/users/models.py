@@ -9,6 +9,7 @@ class User(AbstractUser):
         'username',
         'first_name',
         'last_name',
+        'password',
     )
 
     email = models.EmailField(
@@ -25,7 +26,8 @@ class User(AbstractUser):
         error_messages={
             'unique': 'Пользователь с таким username уже существует',
         },
-        verbose_name='Имя пользователя'
+        verbose_name='Имя пользователя',
+        null=True,
     )
 
     first_name = models.CharField(
@@ -41,7 +43,9 @@ class User(AbstractUser):
     avatar = models.ImageField(
         blank=True,
         null=True,
-        verbose_name='Аватар'
+        verbose_name='Аватар',
+        upload_to='users/',
+        default=None,
     )
 
     class Meta:
@@ -50,4 +54,30 @@ class User(AbstractUser):
         ordering = ('username',)
 
     def __str__(self):
-        return self.username 
+        return self.username
+
+
+class Subscriber(models.Model):
+    """Класс подписок на авторов."""
+
+    user = models.ForeignKey(
+        User, verbose_name='Пользователь', related_name='follower',
+        on_delete=models.CASCADE
+    )
+    author = models.ForeignKey(
+        User, verbose_name='Автор', related_name='following',
+        on_delete=models.CASCADE
+    )
+
+    class Meta:
+        verbose_name = 'Подписка'
+        verbose_name_plural = 'подписки'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'author'],
+                name='unique_subscribe'
+            )
+        ]
+
+    def __str__(self):
+        return f'{self.user.username} - {self.author.username}'

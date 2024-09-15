@@ -47,11 +47,10 @@ class Recipes (models.Model):
     author = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
-        related_name='recipes',
         verbose_name='Автор'
     )
     name = models.CharField(
-        max_length=200,
+        max_length=256,
         verbose_name='Название рецепта'
     )
     image = models.ImageField(
@@ -82,6 +81,7 @@ class Recipes (models.Model):
         verbose_name = 'Рецепт'
         verbose_name_plural = 'Рецепты'
         ordering = ('-is_published',)
+        default_related_name = 'recipes'
 
     def __str__(self):
         return self.name
@@ -105,6 +105,57 @@ class RecipeIngredients (models.Model):
     class Meta:
         verbose_name = 'Ингредиент рецепта'
         verbose_name_plural = 'Ингредиенты рецепта'
+        default_related_name = 'recipe_ingredients'
 
     def __str__(self):
         return f'{self.recipes} {self.ingredients} {self.amount}'
+
+class ShoppingCart(models.Model):
+    """Модель корзины."""
+
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, verbose_name='Автор'
+    )
+    recipe = models.ForeignKey(
+        Recipes, verbose_name='Рецепт', on_delete=models.CASCADE, null=True
+    )
+
+    class Meta:
+        verbose_name = 'Корзина'
+        verbose_name_plural = 'корзины покупок'
+        default_related_name = 'shopping_cart'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['recipe', 'user'],
+                name='unique_recipe_in_shopping_cart'
+            )
+        ]
+
+    def __str__(self):
+        return f'{self.recipe}'
+
+
+class Favorite(models.Model):
+    """Модель избранного."""
+
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, verbose_name='Автор'
+    )
+    recipe = models.ForeignKey(
+        Recipes, on_delete=models.CASCADE, verbose_name='Рецепт'
+    )
+
+    class Meta:
+        verbose_name = 'Избранный рецепт'
+        verbose_name_plural = 'избранные рецепты'
+        default_related_name = 'favorite'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['recipe', 'user'],
+                name='unique_recipe_in_favorite'
+            )
+        ]
+
+    def __str__(self):
+        return f'{self.recipe}'
+
