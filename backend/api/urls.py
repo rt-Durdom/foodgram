@@ -3,7 +3,7 @@ from rest_framework.routers import DefaultRouter
 from . import views
 
 
-from .views import UserViewSet, RecipesViewSet, TagsViewSet, IngredientsViewSet , short_link
+from .views import UserViewSet, RecipesViewSet, TagsViewSet, IngredientsViewSet  #, short_link
 
 app_name = 'api'
 
