@@ -47,10 +47,10 @@ from .permissions import IsAuthorOrAdminOrReadOnly
 class UserViewSet(djoser_views.UserViewSet):
     queryset = User.objects.all()
     pagination_class = LimitPageNumberPaginator
-    permission_classes = (IsAuthorOrAdminOrReadOnly,)
+    permission_classes = (IsAuthenticated,)
 
     def get_permissions(self):
-        if self.action in ('list', 'retrieve'):
+        if self.action in ('list', 'retrieve', 'create',):
             return (AllowAny(),)
         return super().get_permissions()
     
@@ -135,7 +135,7 @@ class UserViewSet(djoser_views.UserViewSet):
             many=True,
             context={'request': request}
         )
-        return self.get_paginated_response(serializer.data)  # Response(serializer.data)
+        return self.get_paginated_response(serializer.data)
 
 
 class TagsViewSet(viewsets.ReadOnlyModelViewSet):  # +
@@ -152,16 +152,11 @@ class IngredientsViewSet(viewsets.ReadOnlyModelViewSet):  # +
     filterset_class = IngredientFilter
 
 
-class RecipesViewSet(viewsets.ModelViewSet):  # filter
+class RecipesViewSet(viewsets.ModelViewSet):  # +
     queryset = Recipes.objects.all()
     pagination_class = LimitPageNumberPaginator
     permission_classes = (IsAuthorOrAdminOrReadOnly, )
     filterset_class = TagsFilter
-
-    def get_permissions(self):
-        if self.action in ('list', 'retrieve'):
-            return (AllowAny(),)
-        return super().get_permissions()
 
     def get_serializer_class(self):
         if self.action in ('list', 'retrieve'):
@@ -241,7 +236,7 @@ class RecipesViewSet(viewsets.ModelViewSet):  # filter
                 )
             return Response(
                 'Рецепт уже удален из списка покупок',
-                status=status.HTTP_400_BAD_REQUEST
+                status=status.HTTP_404_NOT_FOUND
             )
 
     @action(

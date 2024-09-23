@@ -1,5 +1,11 @@
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
+from django.core.files.base import ContentFile
+import base64
+from djoser.serializers import UserCreateSerializer, UserSerializer
+from django.core.validators import RegexValidator, MinValueValidator
+from django.shortcuts import get_object_or_404
+
 from users.models import User
 from recipes.models import (
     Recipes,
@@ -8,11 +14,9 @@ from recipes.models import (
     RecipeIngredients,
     Favorite,
     ShoppingCart,
-    ShortLink
+    ShortLink,
 )
-from django.core.files.base import ContentFile
-import base64
-from djoser.serializers import UserCreateSerializer, UserSerializer
+
 
 
 class Base64ImageField(serializers.ImageField): # +
@@ -102,10 +106,16 @@ class SubscriptionSerializer(UserCustomSerializer):  # +
 class UserSerializer(UserCreateSerializer):
     username = serializers.CharField(
         max_length=150,
-        validators=[UniqueValidator(
-            queryset=User.objects.all(),
-            message='Такой пользователь существует',
-        )]
+        validators=[
+            UniqueValidator(
+                queryset=User.objects.all(),
+                message='Такой пользователь существует',
+            ),
+            RegexValidator(
+                regex=r'^[\w.@+-]+$',
+                message='Вы ввели недопустимые символы',
+            ),
+        ],
     )
     email = serializers.EmailField(
         max_length=254,
@@ -238,7 +248,7 @@ class CreateIngredientSerializer(serializers.ModelSerializer):  # validators
         )
 
 
-class RecipeCreateSerializer(serializers.ModelSerializer):  # validators
+class RecipeCreateSerializer(serializers.ModelSerializer):
 
     ingredients = CreateIngredientSerializer(many=True, write_only=True)
     tags = serializers.PrimaryKeyRelatedField(
@@ -246,6 +256,9 @@ class RecipeCreateSerializer(serializers.ModelSerializer):  # validators
         many=True
     )
     image = Base64ImageField()
+    cooking_time = serializers.IntegerField(
+        validators=([MinValueValidator(1)]),
+    )
 
     class Meta:
         model = Recipes
@@ -259,39 +272,59 @@ class RecipeCreateSerializer(serializers.ModelSerializer):  # validators
             'cooking_time',
         )
 
-    def create(self, validated_data):
-        
-        ingredients = validated_data.pop('ingredients')
-        if len(ingredients) == 0:
+    def validate_ingredients(self, value):
+        if not value:
             raise serializers.ValidationError('Необходимо добавить хотя бы один ингредиент')
+        sum_ingredients = set()
+        for ingredient in value:
+            if ingredient['id'] in sum_ingredients:
+                raise serializers.ValidationError('Два одинаковых ингредиента - один необходимо удалить')
+            sum_ingredients.add(ingredient['id'])
+        for ingredient in value:
+            if ingredient['amount'] < 1:
+                raise serializers.ValidationError('Количество ингредиента должно быть больше нуля')
+        return value
+
+    def create(self, validated_data):
+        ingredients = validated_data.pop('ingredients')
         tags = validated_data.pop('tags')
+        if len(tags) == 0:
+            raise serializers.ValidationError('Необходимо добавить хотя бы один тег')
+        sum_tags = set()
+        for tag in tags:
+            id_tag = tag
+            if id_tag in sum_tags:
+                raise serializers.ValidationError('Два одинаковых тега - один необходимо удалить')
+            else:
+                sum_tags.add(id_tag)
         recipe = Recipes.objects.create(**validated_data)
         recipe.tags.set(tags)
-        sum_ingredients = set()
         for ingredient in ingredients:
-            if ingredient['id'] in sum_ingredients:
-                raise serializers.ValidationError(
-                    'Два одинаковых ингредиента - один необходимо удалить'
-                )
-            else:
-                sum_ingredients.add(ingredient['id'])
-                RecipeIngredients.objects.create(
-                    recipes=recipe,
-                    amount=ingredient['amount'],
-                    ingredients=ingredient['id']
-                )
+            RecipeIngredients.objects.create(recipes=recipe, amount=ingredient['amount'], ingredients=ingredient['id'])
         return recipe
 
     def update(self, instance, validated_data):
         ingredients = validated_data.pop('ingredients')
         tags = validated_data.pop('tags')
-        instance.ingredients.clear()
-        for ingredient in ingredients:
-            RecipeIngredients.objects.create(
-                recipes=instance,
-                amount=ingredient['amount'],
-                ingredients=ingredient['id']
+        if len(tags) == 0:
+            raise serializers.ValidationError(
+                'Список тегов пуст - необходимо добавить хотя бы один тег'
             )
+        sum_tags = set()
+        for tag in tags:
+            id_tag = tag
+            if id_tag in sum_tags:
+                raise serializers.ValidationError(
+                    'Два одинаковых тега - один необходимо удалить'
+                )
+            else:
+                sum_tags.add(id_tag)
+        instance.ingredients.clear()
+        list_ingred = [RecipeIngredients(
+            recipes=instance, amount=ingredient['amount'],
+            ingredients=ingredient['id']
+        ) for ingredient in ingredients]
+        RecipeIngredients.objects.bulk_create(list_ingred)
         instance.tags.clear()
         instance.tags.set(tags)
         return super().update(instance, validated_data)
