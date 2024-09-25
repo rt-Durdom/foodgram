@@ -110,6 +110,7 @@ class RecipeIngredients (models.Model):
     def __str__(self):
         return f'{self.recipes} {self.ingredients} {self.amount}'
 
+
 class ShoppingCart(models.Model):
     """Модель корзины."""
 
@@ -163,7 +164,10 @@ class Favorite(models.Model):
 class ShortLink(models.Model):
     """Модель короткой ссылки."""
 
-    origin_url = models.URLField(max_length=255, verbose_name='Оригинальная ссылка',)
+    origin_url = models.URLField(
+        max_length=255,
+        verbose_name='Оригинальная ссылка',
+    )
     short_url = models.CharField(
         max_length=132, verbose_name='Короткая ссылка', unique=True
     )

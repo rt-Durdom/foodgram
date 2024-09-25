@@ -5,8 +5,6 @@ from django.core.management.base import BaseCommand
 
 from recipes.models import Ingredients
 
-#CHOISES = {Ingredients: 'ingredients.csv'}
-
 
 class Command(BaseCommand):
     def handle(self, *args, **kwargs):
@@ -25,5 +23,5 @@ class Command(BaseCommand):
                         measurement_unit=row[1])
                     for row in category_reader)
         except FileNotFoundError:
-            raise TypeError(f'Файл не найден!')
+            raise TypeError('Файл не найден!')
         self.stdout.write(self.style.SUCCESS('Файл успешно загружен!'))

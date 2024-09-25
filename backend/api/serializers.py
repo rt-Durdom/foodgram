@@ -4,7 +4,6 @@ from django.core.files.base import ContentFile
 import base64
 from djoser.serializers import UserCreateSerializer, UserSerializer
 from django.core.validators import RegexValidator, MinValueValidator
-from django.shortcuts import get_object_or_404
 
 from users.models import User
 from recipes.models import (
@@ -19,7 +18,7 @@ from recipes.models import (
 
 
 
-class Base64ImageField(serializers.ImageField): # +
+class Base64ImageField(serializers.ImageField):
     def to_internal_value(self, data):
         if isinstance(data, str) and data.startswith('data:image'):
             format, imgstr = data.split(';base64,')
@@ -28,7 +27,7 @@ class Base64ImageField(serializers.ImageField): # +
         return super().to_internal_value(data)
 
 
-class UserAvatarSerializer(serializers.ModelSerializer): # +
+class UserAvatarSerializer(serializers.ModelSerializer):
     avatar = Base64ImageField(allow_null=True)
 
     class Meta:
@@ -38,7 +37,7 @@ class UserAvatarSerializer(serializers.ModelSerializer): # +
         )
 
 
-class UserCustomSerializer(UserSerializer):  # +
+class UserCustomSerializer(UserSerializer):
     is_subscribed = serializers.SerializerMethodField()
 
     class Meta:
@@ -74,7 +73,7 @@ class ShortRecipesSerializer(serializers.ModelSerializer):
         )
 
 
-class SubscriptionSerializer(UserCustomSerializer):  # +
+class SubscriptionSerializer(UserCustomSerializer):
     recipes = serializers.SerializerMethodField(read_only=True)
     recipes_count = serializers.SerializerMethodField()
 
@@ -93,9 +92,7 @@ class SubscriptionSerializer(UserCustomSerializer):  # +
         )
 
     def get_recipes(self, obj):
-
         recipes = Recipes.objects.filter(author=obj)
-
         serializers = ShortRecipesSerializer(recipes, many=True)
         return serializers.data
 
@@ -139,7 +136,7 @@ class UserSerializer(UserCreateSerializer):
         )
 
 
-class TagsSerializer(serializers.ModelSerializer):  # +
+class TagsSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Tags
@@ -150,7 +147,7 @@ class TagsSerializer(serializers.ModelSerializer):  # +
         )
 
 
-class IngredientsSerializer(serializers.ModelSerializer):  # +
+class IngredientsSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Ingredients
@@ -161,7 +158,7 @@ class IngredientsSerializer(serializers.ModelSerializer):  # +
         )
 
 
-class RecipesIngredientsSerializer(serializers.ModelSerializer):  # +
+class RecipesIngredientsSerializer(serializers.ModelSerializer):
     id = serializers.IntegerField(source='ingredients.id')
     name = serializers.ReadOnlyField(source='ingredients.name')
     measurement_unit = serializers.ReadOnlyField(
@@ -179,7 +176,6 @@ class RecipesIngredientsSerializer(serializers.ModelSerializer):  # +
 
 
 class ShortLinksSerializer(serializers.Serializer):
-
     short_link = serializers.CharField(source='short_url')
 
     class Meta:
@@ -187,7 +183,7 @@ class ShortLinksSerializer(serializers.Serializer):
         fields = (
             'short_link',
         )
-    
+
     def to_representation(self, instance):
         return {'short_link': instance.short_url}
 
@@ -235,7 +231,7 @@ class RecipesListSerializer(serializers.ModelSerializer):
         return obj.shopping_cart.filter(user=request.user).exists()
 
 
-class CreateIngredientSerializer(serializers.ModelSerializer):  # validators
+class CreateIngredientSerializer(serializers.ModelSerializer):
 
     id = serializers.PrimaryKeyRelatedField(queryset=Ingredients.objects.all())
     amount = serializers.IntegerField(min_value=1, write_only=True)
@@ -274,36 +270,54 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
 
     def validate_ingredients(self, value):
         if not value:
-            raise serializers.ValidationError('Необходимо добавить хотя бы один ингредиент')
+            raise serializers.ValidationError(
+                'Необходимо добавить хотя бы один ингредиент'
+            )
         sum_ingredients = set()
         for ingredient in value:
             if ingredient['id'] in sum_ingredients:
-                raise serializers.ValidationError('Два одинаковых ингредиента - один необходимо удалить')
+                raise serializers.ValidationError(
+                    'Два одинаковых ингредиента - один необходимо удалить'
+                )
             sum_ingredients.add(ingredient['id'])
         for ingredient in value:
             if ingredient['amount'] < 1:
-                raise serializers.ValidationError('Количество ингредиента должно быть больше нуля')
+                raise serializers.ValidationError(
+                    'Количество ингредиента должно быть больше нуля'
+                )
         return value
 
     def create(self, validated_data):
         ingredients = validated_data.pop('ingredients')
         tags = validated_data.pop('tags')
         if len(tags) == 0:
-            raise serializers.ValidationError('Необходимо добавить хотя бы один тег')
+            raise serializers.ValidationError(
+                'Необходимо добавить хотя бы один тег'
+            )
         sum_tags = set()
         for tag in tags:
             id_tag = tag
             if id_tag in sum_tags:
-                raise serializers.ValidationError('Два одинаковых тега - один необходимо удалить')
+                raise serializers.ValidationError(
+                    'Два одинаковых тега - один необходимо удалить'
+                )
             else:
                 sum_tags.add(id_tag)
         recipe = Recipes.objects.create(**validated_data)
         recipe.tags.set(tags)
         for ingredient in ingredients:
-            RecipeIngredients.objects.create(recipes=recipe, amount=ingredient['amount'], ingredients=ingredient['id'])
+            RecipeIngredients.objects.create(
+                recipes=recipe,
+                amount=ingredient['amount'],
+                ingredients=ingredient['id']
+            )
         return recipe
 
     def update(self, instance, validated_data):
+        if 'ingredients' not in validated_data:
+            raise serializers.ValidationError('Нет ингредиентов')
+        if 'tags' not in validated_data:
+            raise serializers.ValidationError('Нет тегов')
         ingredients = validated_data.pop('ingredients')
         tags = validated_data.pop('tags')
         if len(tags) == 0:

@@ -1,9 +1,12 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from . import views
 
-
-from .views import UserViewSet, RecipesViewSet, TagsViewSet, IngredientsViewSet  #, short_link
+from .views import (
+    UserViewSet,
+    RecipesViewSet,
+    TagsViewSet,
+    IngredientsViewSet
+)  # , short_link)
 
 app_name = 'api'
 
@@ -18,5 +21,5 @@ urlpatterns = [
     path('', include(router.urls)),
     path('auth/', include('djoser.urls')),
     path('auth/', include('djoser.urls.authtoken')),
-    #path('recipes/<int:id>/get-link/', short_link, name='get-link')
+    # path('recipes/<int:id>/get-link/', short_link, name='get-link')
 ]

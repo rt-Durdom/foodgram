@@ -1,9 +1,9 @@
-import string
-from random import choices
+#  import string
+#  from random import choices
 
 from djoser import views as djoser_views
 from djoser.serializers import SetPasswordSerializer
-from django.shortcuts import get_object_or_404, redirect
+from django.shortcuts import get_object_or_404  #  , redirect
 from django.http import HttpResponse
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Sum
@@ -17,7 +17,7 @@ from recipes.models import (
     Recipes,
     Tags,
     Ingredients,
-    ShortLink,
+    #  ShortLink,
     Favorite,
     ShoppingCart,
     RecipeIngredients
@@ -34,7 +34,7 @@ from .serializers import (
     IngredientsSerializer,
     FavoriteSerializer,
     ShoppingCartSerializer,
-    ShortLinksSerializer,
+    #  ShortLinksSerializer,
 
 )
 from django.shortcuts import render
@@ -53,7 +53,6 @@ class UserViewSet(djoser_views.UserViewSet):
         if self.action in ('list', 'retrieve', 'create',):
             return (AllowAny(),)
         return super().get_permissions()
-    
 
     def get_serializer_class(self):
         if self.action in ('list', 'me', 'retrieve'):
@@ -138,13 +137,13 @@ class UserViewSet(djoser_views.UserViewSet):
         return self.get_paginated_response(serializer.data)
 
 
-class TagsViewSet(viewsets.ReadOnlyModelViewSet):  # +
+class TagsViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Tags.objects.all()
     serializer_class = TagsSerializer
     pagination_class = None
 
 
-class IngredientsViewSet(viewsets.ReadOnlyModelViewSet):  # +
+class IngredientsViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Ingredients.objects.all()
     serializer_class = IngredientsSerializer
     filter_backends = [DjangoFilterBackend]
@@ -152,7 +151,7 @@ class IngredientsViewSet(viewsets.ReadOnlyModelViewSet):  # +
     filterset_class = IngredientFilter
 
 
-class RecipesViewSet(viewsets.ModelViewSet):  # +
+class RecipesViewSet(viewsets.ModelViewSet):
     queryset = Recipes.objects.all()
     pagination_class = LimitPageNumberPaginator
     permission_classes = (IsAuthorOrAdminOrReadOnly, )
@@ -268,14 +267,10 @@ class RecipesViewSet(viewsets.ModelViewSet):  # +
         )
         return response
 
-
-@api_view(['GET'])
-def short_link(request, id):
-    recipe = get_object_or_404(Recipes, id=id)
-    short_url = 'recipe.short_url'
-    url, _ = ShortLink.objects.get_or_create(short_url=short_url)
-    serializer = ShortLinksSerializer(url, context={'request': request})
-    return redirect(serializer.data)
-
-
-
+# @api_view(['GET'])
+# def short_link(request, id):
+    # recipe = get_object_or_404(Recipes, id=id)
+    # short_url = 'recipe.short_url'
+    # url, _ = ShortLink.objects.get_or_create(short_url=short_url)
+    # serializer = ShortLinksSerializer(url, context={'request': request})
+    # return redirect(serializer.data)
