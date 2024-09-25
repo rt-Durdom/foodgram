@@ -3,7 +3,7 @@
 
 from djoser import views as djoser_views
 from djoser.serializers import SetPasswordSerializer
-from django.shortcuts import get_object_or_404  #  , redirect
+from django.shortcuts import get_object_or_404  # , redirect
 from django.http import HttpResponse
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Sum
@@ -11,7 +11,7 @@ from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.decorators import action, api_view
+from rest_framework.decorators import action  # , api_view
 from users.models import User, Subscriber
 from recipes.models import (
     Recipes,
@@ -37,7 +37,7 @@ from .serializers import (
     #  ShortLinksSerializer,
 
 )
-from django.shortcuts import render
+# from django.shortcuts import render
 
 from .filters import IngredientFilter, TagsFilter
 from .paginators import LimitPageNumberPaginator

@@ -17,7 +17,6 @@ from recipes.models import (
 )
 
 
-
 class Base64ImageField(serializers.ImageField):
     def to_internal_value(self, data):
         if isinstance(data, str) and data.startswith('data:image'):
