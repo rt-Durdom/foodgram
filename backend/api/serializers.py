@@ -91,7 +91,7 @@ class SubscriptionSerializer(UserCustomSerializer):
         )
 
     def get_recipes(self, obj):
-        recipes = Recipes.objects.filter(author=obj)
+        recipes = obj.recipes.all()
         serializers = ShortRecipesSerializer(recipes, many=True)
         return serializers.data
 
@@ -174,17 +174,15 @@ class RecipesIngredientsSerializer(serializers.ModelSerializer):
         )
 
 
-class ShortLinksSerializer(serializers.Serializer):
+class ShortLinksSerializer(serializers.ModelSerializer):
     short_link = serializers.CharField(source='short_url')
 
     class Meta:
         model = ShortLink
-        fields = (
-            'short_link',
-        )
+        fields = ('short_link',)
 
-    def to_representation(self, instance):
-        return {'short_link': instance.short_url}
+    def to_representation(self, value):
+        return {'short-link': value.short_url}
 
 
 class RecipesListSerializer(serializers.ModelSerializer):
@@ -218,13 +216,13 @@ class RecipesListSerializer(serializers.ModelSerializer):
         )
 
     def get_is_favorited(self, obj):
-        request = self.context.get('request')
+        request = self.context['request']
         if request.user.is_anonymous:
             return False
         return obj.favorite.filter(user=request.user).exists()
 
     def get_is_in_shopping_cart(self, obj):
-        request = self.context.get('request')
+        request = self.context['request']
         if request.user.is_anonymous:
             return False
         return obj.shopping_cart.filter(user=request.user).exists()
@@ -286,10 +284,18 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
                 )
         return value
 
+    def get_recipe_ingedients_create(self, obj, val_ingredients):
+        list_ingred = [RecipeIngredients(
+            recipes=obj,
+            amount=ingredient['amount'],
+            ingredients=ingredient['id']
+        ) for ingredient in val_ingredients]
+        return RecipeIngredients.objects.bulk_create(list_ingred)
+
     def create(self, validated_data):
         ingredients = validated_data.pop('ingredients')
         tags = validated_data.pop('tags')
-        if len(tags) == 0:
+        if not tags:
             raise serializers.ValidationError(
                 'Необходимо добавить хотя бы один тег'
             )
@@ -304,12 +310,7 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
                 sum_tags.add(id_tag)
         recipe = Recipes.objects.create(**validated_data)
         recipe.tags.set(tags)
-        for ingredient in ingredients:
-            RecipeIngredients.objects.create(
-                recipes=recipe,
-                amount=ingredient['amount'],
-                ingredients=ingredient['id']
-            )
+        self.get_recipe_ingedients_create(recipe, ingredients)
         return recipe
 
     def update(self, instance, validated_data):
@@ -319,25 +320,19 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError('Нет тегов')
         ingredients = validated_data.pop('ingredients')
         tags = validated_data.pop('tags')
-        if len(tags) == 0:
+        if not tags:
             raise serializers.ValidationError(
                 'Список тегов пуст - необходимо добавить хотя бы один тег'
             )
         sum_tags = set()
         for tag in tags:
-            id_tag = tag
-            if id_tag in sum_tags:
+            if tag in sum_tags:
                 raise serializers.ValidationError(
                     'Два одинаковых тега - один необходимо удалить'
                 )
-            else:
-                sum_tags.add(id_tag)
+            sum_tags.add(tag)
         instance.ingredients.clear()
-        list_ingred = [RecipeIngredients(
-            recipes=instance, amount=ingredient['amount'],
-            ingredients=ingredient['id']
-        ) for ingredient in ingredients]
-        RecipeIngredients.objects.bulk_create(list_ingred)
+        self.get_recipe_ingedients_create(instance, ingredients)
         instance.tags.clear()
         instance.tags.set(tags)
         return super().update(instance, validated_data)

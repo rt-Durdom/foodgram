@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
+# from djoser.serializers import UserSerializer
 
 
 class User(AbstractUser):

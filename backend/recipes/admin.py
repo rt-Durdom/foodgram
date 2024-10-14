@@ -8,7 +8,7 @@ class TagAdmin(admin.ModelAdmin):
 
 
 class IngredientAdmin(admin.ModelAdmin):
-    pass
+    search_fields = ('name',)
 
 
 class RecipeIngredientsInLine(admin.StackedInline):
@@ -19,6 +19,12 @@ class RecipeIngredientsInLine(admin.StackedInline):
 class RecipeAdmin(admin.ModelAdmin):
     inlines = [RecipeIngredientsInLine]
     exclude = ('inredients', )
+    list_display = ('name', 'author', 'count_favorite')
+    search_fields = ('name', 'author__username')
+    list_filter = ('tags',)
+
+    def count_favorite(self, obj):
+        return obj.favorites.count()
 
 
 admin.site.register(Recipes, RecipeAdmin)

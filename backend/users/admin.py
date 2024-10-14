@@ -4,7 +4,7 @@ from users.models import User
 
 
 class UserAdmin(admin.ModelAdmin):
-    pass
+    search_fields = ('first_name', 'email')
 
 
 admin.site.register(User, UserAdmin)

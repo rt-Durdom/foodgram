@@ -1,9 +1,10 @@
-#  import string
-#  from random import choices
+import random
+from string import ascii_letters
 
 from djoser import views as djoser_views
 from djoser.serializers import SetPasswordSerializer
-from django.shortcuts import get_object_or_404  # , redirect
+from django.shortcuts import get_object_or_404, redirect
+from django.contrib.sites.shortcuts import get_current_site
 from django.http import HttpResponse
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Sum
@@ -11,13 +12,14 @@ from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.decorators import action  # , api_view
+from rest_framework.decorators import action, api_view
+
 from users.models import User, Subscriber
 from recipes.models import (
     Recipes,
     Tags,
     Ingredients,
-    #  ShortLink,
+    ShortLink,
     Favorite,
     ShoppingCart,
     RecipeIngredients
@@ -34,11 +36,9 @@ from .serializers import (
     IngredientsSerializer,
     FavoriteSerializer,
     ShoppingCartSerializer,
-    #  ShortLinksSerializer,
+    ShortLinksSerializer,
 
 )
-# from django.shortcuts import render
-
 from .filters import IngredientFilter, TagsFilter
 from .paginators import LimitPageNumberPaginator
 from .permissions import IsAuthorOrAdminOrReadOnly
@@ -57,11 +57,11 @@ class UserViewSet(djoser_views.UserViewSet):
     def get_serializer_class(self):
         if self.action in ('list', 'me', 'retrieve'):
             return UserCustomSerializer
-        elif self.action in ('set_and_del_avatar'):
+        if self.action in ('set_and_del_avatar'):
             return UserAvatarSerializer
-        elif self.action in ('subscribe', 'subscriptions'):
+        if self.action in ('subscribe', 'subscriptions'):
             return SubscriptionSerializer
-        elif self.action in ('set_password'):
+        if self.action in ('set_password'):
             return SetPasswordSerializer
         return UserSerializer
 
@@ -84,7 +84,7 @@ class UserViewSet(djoser_views.UserViewSet):
             serializer.is_valid(raise_exception=True)
             serializer.save()
             return Response(serializer.data, status=status.HTTP_200_OK)
-        elif request.method == 'DELETE':
+        if request.method == 'DELETE':
             user.avatar.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -104,13 +104,13 @@ class UserViewSet(djoser_views.UserViewSet):
                     'Подписка на пользователя есть',
                     status=status.HTTP_400_BAD_REQUEST
                 )
-            else:
-                Subscriber.objects.create(user=user, author=author)
-                serializer = SubscriptionSerializer(author)
-                return Response(
-                    serializer.data,
-                    status=status.HTTP_201_CREATED
-                )
+
+            Subscriber.objects.create(user=user, author=author)
+            serializer = SubscriptionSerializer(author)
+            return Response(
+                serializer.data,
+                status=status.HTTP_201_CREATED
+            )
         elif request.method == 'DELETE':
             if instance.exists():
                 instance.delete()
@@ -162,6 +162,8 @@ class RecipesViewSet(viewsets.ModelViewSet):
             return RecipesListSerializer
         if self.action in ('favorite', 'shopping_cart'):
             return ShortRecipesSerializer
+        if self.action in ('short-link'):
+            pass
         return RecipeCreateSerializer
 
     def perform_create(self, serializer):
@@ -181,15 +183,14 @@ class RecipesViewSet(viewsets.ModelViewSet):
                     'Рецепт уже в избранном',
                     status=status.HTTP_204_NO_CONTENT
                 )
-            else:
-                serializer = FavoriteSerializer(
-                    Favorite.objects.create(user=request.user, recipe_id=pk)
-                )
-                return Response(
-                    serializer.data,
-                    status=status.HTTP_201_CREATED
-                )
-        elif request.method == 'DELETE':
+            serializer = FavoriteSerializer(
+                Favorite.objects.create(user=request.user, recipe_id=pk)
+            )
+            return Response(
+                serializer.data,
+                status=status.HTTP_201_CREATED
+            )
+        if request.method == 'DELETE':
             if fav.exists():
                 fav.delete()
                 return Response(
@@ -215,17 +216,16 @@ class RecipesViewSet(viewsets.ModelViewSet):
                     'Рецепт уже в списке покупок',
                     status=status.HTTP_204_NO_CONTENT
                 )
-            else:
-                serializer = ShoppingCartSerializer(
-                    ShoppingCart.objects.create(
-                        user=request.user,
-                        recipe_id=pk
-                    )
+            serializer = ShoppingCartSerializer(
+                ShoppingCart.objects.create(
+                    user=request.user,
+                    recipe_id=pk
                 )
-                return Response(
-                    serializer.data,
-                    status=status.HTTP_201_CREATED
-                )
+            )
+            return Response(
+                serializer.data,
+                status=status.HTTP_201_CREATED
+            )
         elif request.method == 'DELETE':
             if cart.exists():
                 cart.delete()
@@ -267,10 +267,31 @@ class RecipesViewSet(viewsets.ModelViewSet):
         )
         return response
 
-# @api_view(['GET'])
-# def short_link(request, id):
-    # recipe = get_object_or_404(Recipes, id=id)
-    # short_url = 'recipe.short_url'
-    # url, _ = ShortLink.objects.get_or_create(short_url=short_url)
-    # serializer = ShortLinksSerializer(url, context={'request': request})
-    # return redirect(serializer.data)
+
+@api_view(['GET'])
+def short_link(request, recipe_id):
+    """Получение короткой ссылки."""
+    recipes = get_object_or_404(Recipes, id=recipe_id)
+    if ShortLink.objects.filter(
+        origin_url=recipes.get_absolute_url()
+    ).exists():
+        serializer = ShortLinksSerializer(
+            ShortLink.objects.get(origin_url=recipes.get_absolute_url())
+        )
+        return Response(serializer.data)
+    domain = request.scheme + "://" + request.META.get('HTTP_HOST') + '/s/'
+    short_url = domain + (''.join(random.sample(ascii_letters, k=7)))
+    link, _ = ShortLink.objects.get_or_create(
+        origin_url=recipes.get_absolute_url(),
+        short_url=short_url
+    )
+    serializer = ShortLinksSerializer(link)
+    return Response(serializer.data)
+
+
+def get_full_link(request, short_link):
+    """Получение оригинальной ссылки."""
+    domain = request.scheme + "://" + get_current_site(request).name + '/s/'
+    url = get_object_or_404(ShortLink, short_url=domain + short_link)
+    link = url.origin_url.replace('/api', '', 1)[:-1]
+    return redirect(link)
