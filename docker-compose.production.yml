@@ -15,7 +15,7 @@ services:
   
   backend:
     container_name: foodgram-backend
-    build: ./backend/
+    image: rt4otohub/foodgram_backend
     env_file: .env
     depends_on:
       - db
@@ -25,18 +25,17 @@ services:
 
   frontend:
     env_file: .env
-    container_name: foodgram-frontend
-    build: ./frontend/
+    container_name: foodgram-front
+    image: rt4otohub/foodgram_frontend
     command: cp -r /app/build/. /frontend_static/
     volumes:
       - static:/frontend_static
 
   nginx:
     container_name: foodgram-nginx
-    build: ./infra/
-    env_file: .env
+    image: rt4otohub/foodgram_gateway
     ports:
       - 9000:80
     volumes:
-      - static:/static
+      - static:/static 
       - media:/media
