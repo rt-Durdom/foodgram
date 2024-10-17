@@ -1,9 +1,13 @@
+import base64
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 from django.core.files.base import ContentFile
-import base64
 from djoser.serializers import UserCreateSerializer, UserSerializer
-from django.core.validators import RegexValidator, MinValueValidator
+from django.core.validators import (
+    RegexValidator,
+    MinValueValidator,
+    MaxValueValidator
+)
 
 from users.models import User
 from recipes.models import (
@@ -15,6 +19,9 @@ from recipes.models import (
     ShoppingCart,
     ShortLink,
 )
+
+MIN_COUNT = 1
+MAX_COUNT = 32000
 
 
 class Base64ImageField(serializers.ImageField):
@@ -231,7 +238,10 @@ class RecipesListSerializer(serializers.ModelSerializer):
 class CreateIngredientSerializer(serializers.ModelSerializer):
 
     id = serializers.PrimaryKeyRelatedField(queryset=Ingredients.objects.all())
-    amount = serializers.IntegerField(min_value=1, write_only=True)
+    amount = serializers.IntegerField(
+        write_only=True,
+        validators=[MinValueValidator(MIN_COUNT), MaxValueValidator(MAX_COUNT)]
+    )
 
     class Meta:
         model = RecipeIngredients
@@ -250,7 +260,9 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
     )
     image = Base64ImageField()
     cooking_time = serializers.IntegerField(
-        validators=([MinValueValidator(1)]),
+        validators=(
+            [MinValueValidator(MIN_COUNT), MaxValueValidator(MAX_COUNT)]
+        ),
     )
 
     class Meta:
@@ -277,11 +289,20 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
                     'Два одинаковых ингредиента - один необходимо удалить'
                 )
             sum_ingredients.add(ingredient['id'])
-        for ingredient in value:
-            if ingredient['amount'] < 1:
+        return value
+
+    def validate_tags(self, value):
+        if not value:
+            raise serializers.ValidationError(
+                'Необходимо добавить хотя бы один тег'
+            )
+        sum_tags = set()
+        for tag_value in value:
+            if tag_value in sum_tags:
                 raise serializers.ValidationError(
-                    'Количество ингредиента должно быть больше нуля'
+                    'Два одинаковых тега - один необходимо удалить'
                 )
+            sum_tags.add(tag_value)
         return value
 
     def get_recipe_ingedients_create(self, obj, val_ingredients):
@@ -295,42 +316,14 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         ingredients = validated_data.pop('ingredients')
         tags = validated_data.pop('tags')
-        if not tags:
-            raise serializers.ValidationError(
-                'Необходимо добавить хотя бы один тег'
-            )
-        sum_tags = set()
-        for tag in tags:
-            id_tag = tag
-            if id_tag in sum_tags:
-                raise serializers.ValidationError(
-                    'Два одинаковых тега - один необходимо удалить'
-                )
-            else:
-                sum_tags.add(id_tag)
         recipe = Recipes.objects.create(**validated_data)
         recipe.tags.set(tags)
         self.get_recipe_ingedients_create(recipe, ingredients)
         return recipe
 
     def update(self, instance, validated_data):
-        if 'ingredients' not in validated_data:
-            raise serializers.ValidationError('Нет ингредиентов')
-        if 'tags' not in validated_data:
-            raise serializers.ValidationError('Нет тегов')
         ingredients = validated_data.pop('ingredients')
         tags = validated_data.pop('tags')
-        if not tags:
-            raise serializers.ValidationError(
-                'Список тегов пуст - необходимо добавить хотя бы один тег'
-            )
-        sum_tags = set()
-        for tag in tags:
-            if tag in sum_tags:
-                raise serializers.ValidationError(
-                    'Два одинаковых тега - один необходимо удалить'
-                )
-            sum_tags.add(tag)
         instance.ingredients.clear()
         self.get_recipe_ingedients_create(instance, ingredients)
         instance.tags.clear()

@@ -43,6 +43,8 @@ from .filters import IngredientFilter, TagsFilter
 from .paginators import LimitPageNumberPaginator
 from .permissions import IsAuthorOrAdminOrReadOnly
 
+SIZE_SHORT_URL = 7
+
 
 class UserViewSet(djoser_views.UserViewSet):
     queryset = User.objects.all()
@@ -97,7 +99,7 @@ class UserViewSet(djoser_views.UserViewSet):
     def subcription(self, request, id=None):
         user = self.request.user
         author = get_object_or_404(User, id=id)
-        instance = Subscriber.objects.filter(user=user, author=author)
+        instance = user.follower.filter(author=author)
         if request.method == 'POST':
             if instance.exists():
                 return Response(
@@ -111,7 +113,7 @@ class UserViewSet(djoser_views.UserViewSet):
                 serializer.data,
                 status=status.HTTP_201_CREATED
             )
-        elif request.method == 'DELETE':
+        if request.method == 'DELETE':
             if instance.exists():
                 instance.delete()
                 return Response(
@@ -176,7 +178,7 @@ class RecipesViewSet(viewsets.ModelViewSet):
         url_path='favorite'
     )
     def favorite(self, request, pk):
-        fav = Favorite.objects.filter(user=request.user, recipe_id=pk)
+        fav = request.user.favorite.filter(recipe_id=pk)
         if request.method == 'POST':
             if fav.exists():
                 return Response(
@@ -209,7 +211,7 @@ class RecipesViewSet(viewsets.ModelViewSet):
         url_path='shopping_cart'
     )
     def shopping_cart(self, request, pk):
-        cart = ShoppingCart.objects.filter(user=request.user, recipe_id=pk)
+        cart = request.user.shopping_cart.filter(recipe_id=pk)
         if request.method == 'POST':
             if cart.exists():
                 return Response(
@@ -246,9 +248,7 @@ class RecipesViewSet(viewsets.ModelViewSet):
     )
     def download_shopping_cart(self, request):
         ingredients_list = RecipeIngredients.objects.filter(
-            recipes__in=ShoppingCart.objects.filter(
-                user=request.user
-            ).values('recipe')
+            recipes__in=request.user.shopping_cart.values('recipe')
         ).values(
             'ingredients__name', 'ingredients__measurement_unit'
         ).annotate(
@@ -280,7 +280,9 @@ def short_link(request, recipe_id):
         )
         return Response(serializer.data)
     domain = request.scheme + "://" + request.META.get('HTTP_HOST') + '/s/'
-    short_url = domain + (''.join(random.sample(ascii_letters, k=7)))
+    short_url = domain + (
+        ''.join(random.sample(ascii_letters, SIZE_SHORT_URL))
+    )
     link, _ = ShortLink.objects.get_or_create(
         origin_url=recipes.get_absolute_url(),
         short_url=short_url
